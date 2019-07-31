@@ -71,6 +71,7 @@ class Settings(BaseSchema):
     )
     certificate_path = typesystem.String(allow_null=True)
     key_path = typesystem.String(allow_null=True)
+    access = typesystem.String(allow_null=True)
 
 
 class Route(BaseSchema):

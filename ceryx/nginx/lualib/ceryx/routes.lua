@@ -37,6 +37,18 @@ function getTargetForSource(source, redisClient)
     return target
 end
 
+function getAccessForSource(source, redisClient)
+    ngx.log(ngx.DEBUG, "Get routing access for " .. source .. ".")
+    local settings_key = getSettingsKeyForSource(source)
+    local access, _ = redisClient:hget(settings_key, "access")
+
+    if access == ngx.null then
+        access = "@public"
+    end
+
+    return access
+end
+
 function getModeForSource(source, redisClient)
     ngx.log(ngx.DEBUG, "Get routing mode for " .. source .. ".")
     local settings_key = getSettingsKeyForSource(source)
@@ -74,6 +86,7 @@ function getRouteForSource(source)
     end
 
     route.mode = getModeForSource(source, redisClient)
+    route.access = getAccessForSource(source,redisClient)
 
     return route
 end

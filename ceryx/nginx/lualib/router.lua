@@ -61,5 +61,13 @@ if route == nil then
     return ngx.exit(ngx.HTTP_SERVICE_UNAVAILABLE)
 end
 
+if route.access ~=  "@public" then
+    local user = ngx.req.get_headers()["X-Forwarded-User"]
+    if not string.find(route.access, "{" ..  user .. "}") then
+        ngx.log(ngx.INFO, "Acess is Forbidden. Exiting with Bad Gateway.")
+        return ngx.exit(ngx.HTTP_FORBIDDEN)
+    end
+end 
+
 -- Save found key to local cache for 5 seconds
 routeRequest(host, route.target, route.mode)
