@@ -43,7 +43,8 @@ class RouteDetailView:
     
     async def on_delete(self, req, resp, *, host:str):
         client.delete_route(host)
-        resp.status_code = api.status_codes.HTTP_204
+         resp.media = {"result": f"success"}
+        resp.status_code = api.status_codes.HTTP_200
 
 
 if __name__ == '__main__':
