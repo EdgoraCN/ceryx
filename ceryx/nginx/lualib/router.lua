@@ -61,7 +61,31 @@ if route == nil then
     return ngx.exit(ngx.HTTP_SERVICE_UNAVAILABLE)
 end
 
-if route.access ~=  "@public" then
+if route.access ==  "@token" then
+    local token = ngx.req.get_headers()["x-auth-token"]
+    if token == nil then
+        ngx.log(ngx.DEBUG,"token is missing")
+        return ngx.exit(ngx.HTTP_FORBIDDEN)
+    end
+    local secret = routes.getSecretForSource(host)
+    if secret == "*" and token ~= secret then
+        ngx.log(ngx.DEBUG,"token is wrong")
+        return ngx.exit(ngx.HTTP_FORBIDDEN)
+    end
+elseif route.access ==  "@cookie" then
+    local cookie_name = "X_AUTH_TOKEN"
+    local var_name = "cookie_" .. cookie_name
+    local cookie_value = ngx.var[var_name]
+    if cookie_value == nil then
+        ngx.log(ngx.DEBUG,"cookie_value is missing")
+        return ngx.exit(ngx.HTTP_FORBIDDEN)
+    end
+    local secret = routes.getSecretForSource(host)
+    if secret == "*" or cookie_value ~= secret then
+        ngx.log(ngx.DEBUG,"cookie_value is wrong")
+        return ngx.exit(ngx.HTTP_FORBIDDEN)
+    end
+elseif route.access ~=  "@public" then
     -- for key, value in pairs(ngx.req.get_headers()) do
     --   ngx.log(ngx.DEBUG,key .. "=" .. value)
     -- end
@@ -70,10 +94,20 @@ if route.access ~=  "@public" then
         ngx.log(ngx.DEBUG,"forwarded user is missing")
         return ngx.exit(ngx.HTTP_FORBIDDEN)
     end
-    if not string.find(route.access, "{" .. tostring(user) .. "}") then
-        ngx.log(ngx.INFO, "Acess is Forbidden. Exiting with Bad Gateway.")
-        return ngx.exit(ngx.HTTP_FORBIDDEN)
+    if string.find(route.access, "{" .. tostring(user) .. "}") then
+        return routeRequest(host, route.target, route.mode)
     end
+
+    if role ~= nil and string.find(route.access, "{" .. tostring("#" .. role) .. "}") then
+        return  routeRequest(host, route.target, route.mode)
+    end
+
+    if group ~= nil and  string.find(route.access, "{" .. tostring("%" .. group) .. "}") then
+        return  routeRequest(host, route.target, route.mode)
+    end
+
+    ngx.log(ngx.DEBUG,"forwarded user is forbidden")
+    return ngx.exit(ngx.HTTP_FORBIDDEN)
 end
 
 -- Save found key to local cache for 5 seconds

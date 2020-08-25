@@ -10,6 +10,10 @@ function getSettingsKeyForSource(source)
     return redis.prefix .. ":settings:" .. source
 end
 
+function getSecretKeyForSource(source)
+    return redis.prefix .. ":secret:" .. source
+end
+
 function targetIsInValid(target)
     return not target or target == ngx.null
 end
@@ -43,22 +47,51 @@ function getAccessForSource(source, redisClient)
     local access, _ = redisClient:hget(settings_key, "access")
 
     if access == ngx.null then
-        access = "@public"
+        access = "@public" -- default access
     end
 
     return access
 end
 
-function getModeForSource(source, redisClient)
-    ngx.log(ngx.DEBUG, "Get routing mode for " .. source .. ".")
-    local settings_key = getSettingsKeyForSource(source)
-    local mode, _ = redisClient:hget(settings_key, "mode")
+function getSecretFromRedis(source, redisClient)
+    ngx.log(ngx.DEBUG, "Get routing secret for " .. source .. ".")
+    local secret_key = getSecretKeyForSource(source)
+    local secret, _ = redisClient:get(secret_key)
 
-    if mode == ngx.null or not mode then
-        mode = "proxy"
+    if secret == ngx.null then
+        secret = "*" -- default secret
     end
 
+    return secret
+end
+
+function getModeForSource(source, redisClient)
+    -- ngx.log(ngx.DEBUG, "Get routing mode for " .. source .. ".")
+    -- local settings_key = getSettingsKeyForSource(source)
+    -- local mode, _ = redisClient:hget(settings_key, "mode")
+
+    -- if mode == ngx.null or not mode then
+    --    mode = "proxy"
+    -- end
+    local mode = "proxy"
     return mode
+end
+
+function getSecretForSource(source)
+    local _
+    local cache = ngx.shared.ceryx
+    local redisClient = redis:client()
+    local keyName = source .. ".secret"
+    local cached_secret, _ = cache:get(keyName)
+    if cached_secret then
+        ngx.log(ngx.DEBUG, "Cache hit for " .. keyName)
+        return cached_secret
+    else
+        ngx.log(ngx.DEBUG, "Cache miss for " .. keyName)
+        local secret = getSecretFromRedis(source,redisClient)
+        cache:set(keyName, secret, 10)
+        return secret
+    end
 end
 
 function getRouteForSource(source)
@@ -86,13 +119,24 @@ function getRouteForSource(source)
     end
 
     route.mode = getModeForSource(source, redisClient)
-    route.access = getAccessForSource(source,redisClient)
 
+    local keyName = source .. ".access"
+    local cached_access, _ = cache:get(keyName)
+    if cached_access then
+        ngx.log(ngx.DEBUG, "Cache hit for " .. keyName)
+        route.access = cached_access
+    else
+        ngx.log(ngx.DEBUG, "Cache miss for " .. keyName)
+        route.access = getAccessForSource(source,redisClient)
+        cache:set(keyName, route.access, 10)
+        ngx.log(ngx.DEBUG, "Caching from " .. keyName .. " to " .. route.access .. " for 10 seconds.")
+    end
     return route
 end
 
 exports.getSettingsKeyForSource = getSettingsKeyForSource
 exports.getRouteForSource = getRouteForSource
 exports.getTargetForSource = getTargetForSource
+exports.getSecretForSource = getSecretForSource
 
 return exports
