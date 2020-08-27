@@ -1,4 +1,4 @@
-FROM openresty/openresty:1.13.6.1-xenial
+FROM openresty/openresty:bionic
 
 ARG user=www-data
 ARG group=www-data
@@ -18,7 +18,7 @@ RUN curl -fSslL https://github.com/jwilder/dockerize/releases/download/${DOCKERI
 
 # Install lua-resty-auto-ssl for dynamically generating certificates from LE
 # https://github.com/GUI/lua-resty-auto-ssl
-RUN /usr/local/openresty/luajit/bin/luarocks install lua-resty-auto-ssl 0.12.0 &&\
+RUN /usr/local/openresty/luajit/bin/luarocks install lua-resty-auto-ssl 0.13.1 &&\
     mkdir /etc/resty-auto-ssl/ &&\
     chown -R $user:$group /etc/resty-auto-ssl/
 
